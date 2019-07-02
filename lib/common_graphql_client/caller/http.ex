@@ -3,18 +3,40 @@ if Code.ensure_loaded?(HTTPoison) do
     @behaviour CommonGraphQLClient.CallerBehaviour
 
     @impl CommonGraphQLClient.CallerBehaviour
-    def post(client, query, variables \\ [], _opts \\ []) do
+    def post(client, query, variables \\ [], opts \\ []) do
       body = %{
         query: query,
         variables: variables
       } |> Poison.encode!
 
-      case HTTPoison.post(client.http_api_url(), body, [{"Content-Type", "application/json"}, {"authorization", "Bearer #{client.http_api_token()}"}]) do
+      headers = get_headers(client, opts)
+      
+      case HTTPoison.post(client.http_api_url(), body, headers) do
         {:ok, %{body: json_body}} ->
           body = Poison.decode!(json_body)
           {:ok, body["data"], body["errors"]}
         {:error, error} ->
           {:error, error}
+      end
+    end
+
+    def get_headers(client, opts) do
+      
+      headers = case client.http_api_token() do
+        token when is_binary(token) ->
+          [
+            {"authorization", "Bearer #{client.http_api_token()}"},
+            {"Content-Type", "application/json"}
+          ]
+        _ ->
+          [{"Content-Type", "application/json"}]
+      end
+
+      case Keyword.get(opts, :headers) do
+        list when is_list(list) ->
+          headers ++ list
+         _ ->
+          headers
       end
     end
 
